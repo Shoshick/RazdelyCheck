@@ -17,10 +17,11 @@ func NewCheckSourceRepo(db *sqlx.DB) repo.CheckSourceRepo {
 }
 
 func (r *checkSourceRepo) Create(cs *dto.CheckSource) error {
-	_, err := r.db.Exec(
-		`INSERT INTO check_sources (id, check_id, data) VALUES ($1, $2, $3)`,
-		cs.ID, cs.CheckID, cs.Data,
-	)
+	query := `
+        INSERT INTO check_source (id, check_id, qr, data)
+        VALUES ($1, $2, $3, $4)
+    `
+	_, err := r.db.Exec(query, cs.ID, cs.CheckID, cs.QR, cs.Data)
 	return err
 }
 

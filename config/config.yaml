@@ -1,0 +1,19 @@
+database:
+  host: "localhost"
+  port: 5432
+  user: "postgres"
+  password: "password"
+  dbname: "razdelycheck"
+  sslmode: "disable"
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+
+auth:
+  jwtSecret: "some-secret-key"
+  tokenTTL: 3600
+
+paths:
+  uploads: "./uploads"
+  logs: "./logs"

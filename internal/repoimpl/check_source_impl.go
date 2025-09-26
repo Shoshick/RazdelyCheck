@@ -3,6 +3,8 @@ package repo_impl
 import (
 	"RazdelyCheck/internal/dto"
 	"RazdelyCheck/internal/repo"
+	"context"
+	"database/sql"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -32,4 +34,29 @@ func (r *checkSourceRepo) GetByCheckID(checkID uuid.UUID) (*dto.CheckSource, err
 		return nil, err
 	}
 	return &cs, nil
+}
+
+func (r *checkSourceRepo) CreateTx(tx *sql.Tx, cs *dto.CheckSource) error {
+	_, err := tx.ExecContext(
+		context.Background(),
+		`INSERT INTO check_sources (check_id, qr) VALUES ($1, $2)`,
+		cs.CheckID,
+		cs.QR,
+	)
+	return err
+}
+
+func (r *checkSourceRepo) CreateItemTx(tx *sql.Tx, item *dto.Item) error {
+	_, err := tx.ExecContext(
+		context.Background(),
+		`INSERT INTO items (id, check_id, position, name, price, quantity)
+		 VALUES ($1, $2, $3, $4, $5, $6)`,
+		item.ID,
+		item.CheckID,
+		item.Position,
+		item.Name,
+		item.Price,
+		item.Quantity,
+	)
+	return err
 }

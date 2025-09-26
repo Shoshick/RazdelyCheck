@@ -1,10 +1,9 @@
 package repo_impl
 
 import (
-	"context"
-
 	"RazdelyCheck/internal/dto"
 	"RazdelyCheck/internal/repo"
+	"context"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -41,12 +40,12 @@ func (r *userRepo) GetByID(id uuid.UUID) (*dto.User, error) {
 	return u, nil
 }
 
-func (r *userRepo) List() ([]*dto.User, error) {
+func (r *userRepo) ListByOwner(id uuid.UUID) ([]*dto.User, error) {
 	var users []*dto.User
 	err := r.db.SelectContext(
 		context.Background(),
 		&users,
-		`SELECT id, email, name, owner FROM "User"`,
+		`SELECT id, email, name, owner FROM "User" WHERE owner = $1`, id,
 	)
 	if err != nil {
 		return nil, err
@@ -54,11 +53,37 @@ func (r *userRepo) List() ([]*dto.User, error) {
 	return users, nil
 }
 
-func (r *userRepo) Update(u *dto.User) error {
+func (r *userRepo) ExistsByEmail(email string) (bool, error) {
+	var exists bool
+	err := r.db.Get(&exists, `SELECT EXISTS(SELECT 1 FROM "User" WHERE email = $1)`, email)
+	return exists, err
+}
+
+func (r *userRepo) UpdateName(id uuid.UUID, name string) error {
 	_, err := r.db.ExecContext(
 		context.Background(),
-		`UPDATE "User" SET email=$1, name=$2, owner=$3 WHERE id=$4`,
-		u.Email, u.Name, u.OwnerID, u.ID,
+		`UPDATE "User" SET name = $1 WHERE id = $2`,
+		name, id,
+	)
+	return err
+}
+
+// Обновить email пользователя
+func (r *userRepo) UpdateEmail(id uuid.UUID, email string) error {
+	_, err := r.db.ExecContext(
+		context.Background(),
+		`UPDATE "User" SET email = $1 WHERE id = $2`,
+		email, id,
+	)
+	return err
+}
+
+// Обновить owner пользователя
+func (r *userRepo) UpdateOwner(id uuid.UUID, ownerID uuid.UUID) error {
+	_, err := r.db.ExecContext(
+		context.Background(),
+		`UPDATE "User" SET owner = $1 WHERE id = $2`,
+		ownerID, id,
 	)
 	return err
 }

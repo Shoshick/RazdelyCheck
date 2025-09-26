@@ -6,7 +6,7 @@ type User struct {
 	ID      uuid.UUID  `db:"id" json:"id"`
 	Email   *string    `db:"email" json:"email,omitempty"`
 	Name    *string    `db:"name" json:"name,omitempty"`
-	OwnerID *uuid.UUID `db:"owner" json:"owner,omitempty"` // self-reference
+	OwnerID *uuid.UUID `db:"owner" json:"owner,omitempty"`
 }
 
 type UserToGroup struct {

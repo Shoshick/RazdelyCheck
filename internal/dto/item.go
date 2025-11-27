@@ -7,7 +7,7 @@ type Item struct {
 	CheckID  uuid.UUID `db:"check_id"`
 	Position int       `db:"position"`
 	Name     string    `db:"name"`
-	Price    float64   `db:"price"`
+	Price    int64     `db:"price"`
 	Quantity float64   `db:"quantity"`
 }
 

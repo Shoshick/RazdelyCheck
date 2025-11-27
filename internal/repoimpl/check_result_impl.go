@@ -18,7 +18,7 @@ func NewCheckResultRepo(db *sqlx.DB) repo.CheckResultRepo {
 
 func (r *checkResultRepo) ListByCheckID(checkID uuid.UUID) ([]*dto.CheckResult, error) {
 	var results []*dto.CheckResult
-	err := r.db.Select(&results, "SELECT id, check_id, user_id, amount FROM check_results WHERE check_id = $1", checkID)
+	err := r.db.Select(&results, "SELECT id, check_id, user_id, total_due FROM check_result WHERE check_id = $1", checkID)
 	if err != nil {
 		return nil, err
 	}
@@ -27,7 +27,7 @@ func (r *checkResultRepo) ListByCheckID(checkID uuid.UUID) ([]*dto.CheckResult, 
 
 func (r *checkResultRepo) ListByUserID(userID uuid.UUID) ([]*dto.CheckResult, error) {
 	var results []*dto.CheckResult
-	err := r.db.Select(&results, "SELECT id, check_id, user_id, amount FROM check_results WHERE user_id = $1", userID)
+	err := r.db.Select(&results, "SELECT id, check_id, user_id, total_due FROM check_result WHERE user_id = $1", userID)
 	if err != nil {
 		return nil, err
 	}

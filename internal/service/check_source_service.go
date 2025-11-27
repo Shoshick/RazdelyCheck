@@ -7,58 +7,79 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/google/uuid"
 )
 
 type CheckSourceService struct {
-	repo repo.CheckSourceRepo
-	db   *sql.DB
+	repo         repo.CheckSourceRepo
+	db           *sql.DB
+	checkService *CheckService
 }
 
-func NewCheckSourceService(r repo.CheckSourceRepo, db *sql.DB) *CheckSourceService {
+func NewCheckSourceService(r repo.CheckSourceRepo, db *sql.DB, cs *CheckService) *CheckSourceService {
 	return &CheckSourceService{
-		repo: r,
-		db:   db,
+		repo:         r,
+		db:           db,
+		checkService: cs,
 	}
 }
 
-// ProcessQR сохраняет QR-код и товары в рамках одной транзакции
-func (s *CheckSourceService) ProcessQR(input dto.QRScanInput, checkID uuid.UUID, jsonData []byte) error {
+func (s *CheckSourceService) ProcessQR(userID uuid.UUID, input dto.QRScanInput, jsonData []byte) (*dto.Check, error) {
 	if input.QRData == "" {
-		return errors.New("QR is empty")
+		return nil, errors.New("QR is empty")
 	}
 
-	// Разбор JSON в Items
-	items, err := ParseCheckJSON(jsonData, checkID)
-	if err != nil {
-		return err
-	}
+	var check *dto.Check
+	var items []dto.Item
+	var totalSum int64
+	var err error
 
-	checkSource := dto.CheckSource{
-		CheckID: checkID,
-		QR:      input.QRData,
-	}
+	err = util.WithTransaction(s.db, func(tx *sql.Tx) error {
 
-	// Атомарное сохранение через транзакцию
-	return util.WithTransaction(s.db, func(tx *sql.Tx) error {
+		items, totalSum, err = ParseCheckJSON(jsonData, uuid.Nil)
+		if err != nil {
+			return err
+		}
+
+		check, err = s.checkService.Create(userID, nil, totalSum)
+		if err != nil {
+			return err
+		}
+
+		checkSource := dto.CheckSource{
+			CheckID: check.ID,
+			QR:      input.QRData,
+		}
 		if err := s.repo.CreateTx(tx, &checkSource); err != nil {
 			return err
 		}
 
-		for _, item := range items {
-			if err := s.repo.CreateItemTx(tx, &item); err != nil {
+		for i := range items {
+			items[i].CheckID = check.ID
+			if err := s.repo.CreateItemTx(tx, &items[i]); err != nil {
 				return err
 			}
 		}
 
 		return nil
 	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return check, nil
 }
 
-func ParseCheckJSON(jsonData []byte, checkID uuid.UUID) ([]dto.Item, error) {
+func ParseCheckJSON(jsonData []byte, checkID uuid.UUID) ([]dto.Item, int64, error) {
 	var raw dto.CheckResponse
 	if err := json.Unmarshal(jsonData, &raw); err != nil {
-		return nil, err
+		return nil, 0, err
+	}
+
+	if raw.Code != 1 {
+		return nil, 0, fmt.Errorf("API returned code %d", raw.Code)
 	}
 
 	items := make([]dto.Item, len(raw.Data.JSON.Items))
@@ -68,9 +89,12 @@ func ParseCheckJSON(jsonData []byte, checkID uuid.UUID) ([]dto.Item, error) {
 			CheckID:  checkID,
 			Position: i + 1,
 			Name:     r.Name,
-			Price:    float64(r.Price) / 100,
+			Price:    int64(r.Price),
 			Quantity: r.Quantity,
 		}
 	}
-	return items, nil
+
+	totalSum := int64(raw.Data.JSON.TotalSum)
+
+	return items, totalSum, nil
 }

@@ -21,8 +21,8 @@ func NewCheckRepo(db *sqlx.DB) repo.CheckRepo {
 func (r *checkRepo) Create(c *dto.Check) error {
 	_, err := r.db.ExecContext(
 		context.Background(),
-		`INSERT INTO "Check" (id, user_id, total_sum, created_at) VALUES ($1,$2,$3,$4)`,
-		c.ID, c.UserID, c.TotalSum, c.CreatedAt,
+		`INSERT INTO "Check" (id, user_id, total_sum, group_id, created_at) VALUES ($1,$2,$3,$4,$5)`,
+		c.ID, c.UserID, c.TotalSum, c.GroupID, c.CreatedAt,
 	)
 	return err
 }
@@ -32,7 +32,7 @@ func (r *checkRepo) GetByID(id uuid.UUID) (*dto.Check, error) {
 	err := r.db.GetContext(
 		context.Background(),
 		c,
-		`SELECT id, user_id, total_sum, created_at FROM "Check" WHERE id=$1`,
+		`SELECT id, user_id, group_id, total_sum, created_at FROM "Check" WHERE id=$1`,
 		id,
 	)
 	if err != nil {
@@ -46,22 +46,13 @@ func (r *checkRepo) ListByUserID(userID uuid.UUID) ([]*dto.Check, error) {
 	err := r.db.SelectContext(
 		context.Background(),
 		&checks,
-		`SELECT id, user_id, total_sum, created_at FROM "Check" WHERE user_id=$1`,
+		`SELECT id, user_id, group_id, total_sum, created_at FROM "Check" WHERE user_id=$1`,
 		userID,
 	)
 	if err != nil {
 		return nil, err
 	}
 	return checks, nil
-}
-
-func (r *checkRepo) Update(c *dto.Check) error {
-	_, err := r.db.ExecContext(
-		context.Background(),
-		`UPDATE "Check" SET user_id=$1, total_sum=$2, created_at=$3 WHERE id=$4`,
-		c.UserID, c.TotalSum, c.CreatedAt, c.ID,
-	)
-	return err
 }
 
 func (r *checkRepo) Delete(id uuid.UUID) error {

@@ -8,7 +8,8 @@ import (
 type Check struct {
 	ID        uuid.UUID `db:"id" json:"id"`
 	UserID    uuid.UUID `db:"user_id" json:"userId"`
-	TotalSum  float64   `db:"total_sum" json:"totalSum"`
+	GroupID   uuid.UUID `db:"group_id" json:"groupId"`
+	TotalSum  int64     `db:"total_sum" json:"totalSum"`
 	CreatedAt time.Time `db:"created_at" json:"createdAt"`
 }
 

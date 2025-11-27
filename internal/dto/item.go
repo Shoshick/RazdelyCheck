@@ -3,12 +3,12 @@ package dto
 import "github.com/google/uuid"
 
 type Item struct {
-	ID       uuid.UUID `db:"id" json:"id"`
-	CheckID  uuid.UUID `db:"check_id" json:"checkId"`
-	Position int       `db:"position" json:"position"`
-	Name     string    `db:"name" json:"name"`
-	Price    float64   `db:"price" json:"price"`
-	Quantity float64   `db:"quantity" json:"quantity"`
+	ID       uuid.UUID `db:"id"`
+	CheckID  uuid.UUID `db:"check_id"`
+	Position int       `db:"position"`
+	Name     string    `db:"name"`
+	Price    float64   `db:"price"`
+	Quantity float64   `db:"quantity"`
 }
 
 type ItemToUser struct {

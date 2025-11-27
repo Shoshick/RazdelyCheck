@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"github.com/google/uuid"
 )
 
@@ -56,28 +55,22 @@ func (s *CheckSourceService) ProcessQR(input dto.QRScanInput, checkID uuid.UUID,
 	})
 }
 
-// ParseCheckJSON разбирает JSON и возвращает список товаров с привязкой к checkID
 func ParseCheckJSON(jsonData []byte, checkID uuid.UUID) ([]dto.Item, error) {
-	var resp dto.CheckResponse
-	if err := json.Unmarshal(jsonData, &resp); err != nil {
+	var raw dto.CheckResponse
+	if err := json.Unmarshal(jsonData, &raw); err != nil {
 		return nil, err
 	}
 
-	if resp.Code != 1 {
-		return nil, fmt.Errorf("check not ready, code: %d", resp.Code)
-	}
-
-	items := make([]dto.Item, len(resp.Data.JSON.Items))
-	for i, it := range resp.Data.JSON.Items {
+	items := make([]dto.Item, len(raw.Data.JSON.Items))
+	for i, r := range raw.Data.JSON.Items {
 		items[i] = dto.Item{
 			ID:       uuid.New(),
 			CheckID:  checkID,
 			Position: i + 1,
-			Name:     it.Name,
-			Price:    float64(it.Price) / 100,
-			Quantity: it.Quantity,
+			Name:     r.Name,
+			Price:    float64(r.Price) / 100,
+			Quantity: r.Quantity,
 		}
 	}
-
 	return items, nil
 }

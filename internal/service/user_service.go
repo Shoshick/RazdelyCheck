@@ -18,19 +18,16 @@ func NewUserService(r repo.UserRepo) *UserService {
 }
 
 func (s *UserService) CreateUser(u *dto.User) error {
-	// Проверка имени
 	if u.Name == nil || *u.Name == "" {
 		return fmt.Errorf("name cannot be empty")
 	}
 
-	// Проверяем owner
 	if u.OwnerID != nil {
 		if _, err := s.repo.GetByID(*u.OwnerID); err != nil {
 			return fmt.Errorf("owner not found: %w", err)
 		}
 	}
 
-	// Проверяем уникальность email
 	if u.Email != nil && *u.Email != "" {
 		exists, err := s.repo.ExistsByEmail(*u.Email)
 		if err != nil {

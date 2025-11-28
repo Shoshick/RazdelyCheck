@@ -9,12 +9,18 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
+	"io"
+	"net/http"
+	"net/url"
+	"strings"
 )
 
 type CheckSourceService struct {
 	repo         repo.CheckSourceRepo
 	db           *sql.DB
 	checkService *CheckService
+	httpClient   *http.Client // <-- пригодится
+	token        string       // <-- токен вынесем в конфиг
 }
 
 func NewCheckSourceService(r repo.CheckSourceRepo, db *sql.DB, cs *CheckService) *CheckSourceService {
@@ -30,10 +36,14 @@ func (s *CheckSourceService) ProcessQR(userID uuid.UUID, input dto.QRScanInput, 
 		return nil, errors.New("QR is empty")
 	}
 
+	jsonData, err := s.FetchCheckJSON(input.QRData)
+	if err != nil {
+		return nil, fmt.Errorf("fetch JSON failed: %w", err)
+	}
+
 	var check *dto.Check
 	var items []dto.Item
 	var totalSum int64
-	var err error
 
 	err = util.WithTransaction(s.db, func(tx *sql.Tx) error {
 
@@ -97,4 +107,30 @@ func ParseCheckJSON(jsonData []byte, checkID uuid.UUID) ([]dto.Item, int64, erro
 	totalSum := int64(raw.Data.JSON.TotalSum)
 
 	return items, totalSum, nil
+}
+
+func (s *CheckSourceService) FetchCheckJSON(qrRaw string) ([]byte, error) {
+	apiURL := "https://proverkacheka.com/api/v1/check/get"
+
+	data := url.Values{}
+	data.Set("token", s.token)
+	data.Set("qrraw", qrRaw)
+
+	req, err := http.NewRequest("POST", apiURL, strings.NewReader(data.Encode()))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("API returned status %d", resp.StatusCode)
+	}
+
+	return io.ReadAll(resp.Body)
 }

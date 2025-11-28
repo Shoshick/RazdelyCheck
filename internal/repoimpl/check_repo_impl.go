@@ -55,6 +55,15 @@ func (r *checkRepo) ListByUserID(userID uuid.UUID) ([]*dto.Check, error) {
 	return checks, nil
 }
 
+func (r *checkRepo) UpdateTotalSum(id uuid.UUID, totalSum int64) error {
+	_, err := r.db.Exec(`
+		UPDATE "Check"
+		SET total_sum = $2
+		WHERE id = $1
+	`, id, totalSum)
+	return err
+}
+
 func (r *checkRepo) Delete(id uuid.UUID) error {
 	_, err := r.db.ExecContext(
 		context.Background(),

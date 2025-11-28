@@ -13,6 +13,7 @@ import (
 type CheckService struct {
 	checkRepo repo.CheckRepo
 	groupRepo repo.GroupRepo
+	itemRepo  repo.ItemRepo
 }
 
 func NewCheckService(cRepo repo.CheckRepo, gRepo repo.GroupRepo) *CheckService {
@@ -78,6 +79,48 @@ func (s *CheckService) Delete(id, currentUserID uuid.UUID, isAdmin bool) error {
 	return s.checkRepo.Delete(id)
 }
 
+func (s *CheckService) UpdateTotalSum(userID, checkID uuid.UUID, totalSum int64) (*dto.Check, error) {
+
+	if totalSum < 0 {
+		return nil, errors.New("total sum cannot be negative")
+	}
+
+	check, err := s.checkRepo.GetByID(checkID)
+	if err != nil {
+		return nil, err
+	}
+
+	if check.UserID != userID {
+		return nil, errors.New("forbidden")
+	}
+
+	err = s.checkRepo.UpdateTotalSum(checkID, totalSum)
+	if err != nil {
+		return nil, err
+	}
+
+	check.TotalSum = totalSum
+	return check, nil
+}
+
 func (s *CheckService) ListByUser(userID uuid.UUID) ([]*dto.Check, error) {
 	return s.checkRepo.ListByUserID(userID)
+}
+
+func (s *CheckService) GetItemsFromCheck(userID, checkID uuid.UUID) ([]*dto.Item, error) {
+
+	check, err := s.checkRepo.GetByID(checkID)
+	if err != nil {
+		return nil, err
+	}
+	if check.UserID != userID {
+		return nil, errors.New("forbidden")
+	}
+
+	items, err := s.itemRepo.ListByCheckID(checkID)
+	if err != nil {
+		return nil, err
+	}
+
+	return items, nil
 }

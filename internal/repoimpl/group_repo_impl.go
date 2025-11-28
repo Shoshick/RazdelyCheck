@@ -1,7 +1,9 @@
 package repo_impl
 
 import (
+	"RazdelyCheck/internal/util"
 	"context"
+	"database/sql"
 
 	"RazdelyCheck/internal/dto"
 	"RazdelyCheck/internal/repo"
@@ -10,15 +12,19 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-type groupRepo struct {
-	db *sqlx.DB
+type GroupRepo struct {
+	db              *sqlx.DB
+	CheckResultRepo repo.CheckResultRepo
 }
 
-func NewGroupRepo(db *sqlx.DB) repo.GroupRepo {
-	return &groupRepo{db: db}
+func NewGroupRepo(db *sqlx.DB, crRepo repo.CheckResultRepo) *GroupRepo {
+	return &GroupRepo{
+		db:              db,
+		CheckResultRepo: crRepo,
+	}
 }
 
-func (r *groupRepo) Create(g *dto.Group) error {
+func (r *GroupRepo) Create(g *dto.Group) error {
 	_, err := r.db.ExecContext(
 		context.Background(),
 		`INSERT INTO "Group" (id) VALUES ($1)`,
@@ -27,7 +33,7 @@ func (r *groupRepo) Create(g *dto.Group) error {
 	return err
 }
 
-func (r *groupRepo) GetByID(id uuid.UUID) (*dto.Group, error) {
+func (r *GroupRepo) GetByID(id uuid.UUID) (*dto.Group, error) {
 	g := &dto.Group{}
 	err := r.db.GetContext(
 		context.Background(),
@@ -41,7 +47,7 @@ func (r *groupRepo) GetByID(id uuid.UUID) (*dto.Group, error) {
 	return g, nil
 }
 
-func (r *groupRepo) List() ([]*dto.Group, error) {
+func (r *GroupRepo) List() ([]*dto.Group, error) {
 	var groups []*dto.Group
 	err := r.db.SelectContext(
 		context.Background(),
@@ -54,7 +60,7 @@ func (r *groupRepo) List() ([]*dto.Group, error) {
 	return groups, nil
 }
 
-func (r *groupRepo) ListByUser(userID uuid.UUID) ([]*dto.Group, error) {
+func (r *GroupRepo) ListByUser(userID uuid.UUID) ([]*dto.Group, error) {
 	var groups []*dto.Group
 	err := r.db.Select(
 		&groups,
@@ -67,7 +73,7 @@ func (r *groupRepo) ListByUser(userID uuid.UUID) ([]*dto.Group, error) {
 	return groups, err
 }
 
-func (r *groupRepo) ListByGroup(groupID uuid.UUID) ([]*dto.User, error) {
+func (r *GroupRepo) ListByGroup(groupID uuid.UUID) ([]*dto.User, error) {
 	var users []*dto.User
 	err := r.db.Select(
 		&users,
@@ -80,7 +86,7 @@ func (r *groupRepo) ListByGroup(groupID uuid.UUID) ([]*dto.User, error) {
 	return users, err
 }
 
-func (r *groupRepo) Update(g *dto.Group) error {
+func (r *GroupRepo) Update(g *dto.Group) error {
 	_, err := r.db.ExecContext(
 		context.Background(),
 		`UPDATE "Group" SET id=$1 WHERE id=$2`,
@@ -89,7 +95,7 @@ func (r *groupRepo) Update(g *dto.Group) error {
 	return err
 }
 
-func (r *groupRepo) Delete(id uuid.UUID) error {
+func (r *GroupRepo) Delete(id uuid.UUID) error {
 	_, err := r.db.ExecContext(
 		context.Background(),
 		`DELETE FROM "Group" WHERE id=$1`,
@@ -98,7 +104,7 @@ func (r *groupRepo) Delete(id uuid.UUID) error {
 	return err
 }
 
-func (r *groupRepo) ExistsUserInGroup(userID, groupID uuid.UUID) (bool, error) {
+func (r *GroupRepo) ExistsUserInGroup(userID, groupID uuid.UUID) (bool, error) {
 	var exists bool
 	err := r.db.Get(
 		&exists,
@@ -108,18 +114,73 @@ func (r *groupRepo) ExistsUserInGroup(userID, groupID uuid.UUID) (bool, error) {
 	return exists, err
 }
 
-func (r *groupRepo) AddUserToGroup(userID, groupID uuid.UUID) error {
-	_, err := r.db.Exec(
-		`INSERT INTO user_to_group (id, group_id, user_id) VALUES ($1, $2, $3)`,
-		uuid.New(), groupID, userID,
-	)
-	return err
+func (r *GroupRepo) AddUserToGroup(userID, groupID uuid.UUID) error {
+	return util.WithTransaction(r.db.DB, func(tx *sql.Tx) error {
+
+		_, err := tx.Exec(`
+			INSERT INTO user_to_group (id, group_id, user_id)
+			VALUES ($1, $2, $3)
+		`, uuid.New(), groupID, userID)
+		if err != nil {
+			return err
+		}
+
+		var checkID uuid.UUID
+		err = tx.QueryRow(`
+			SELECT id
+			FROM "Check"
+			WHERE group_id = $1
+		`, groupID).Scan(&checkID)
+		if err != nil {
+			return err
+		}
+
+		cr := &dto.CheckResult{
+			ID:       uuid.New(),
+			CheckID:  checkID,
+			UserID:   userID,
+			TotalDue: 0,
+		}
+		err = r.CheckResultRepo.CreateCheckResultTx(tx, cr)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
 
-func (r *groupRepo) RemoveUserFromGroup(userID, groupID uuid.UUID) error {
-	_, err := r.db.Exec(
-		`DELETE FROM user_to_group WHERE user_id=$1 AND group_id=$2`,
-		userID, groupID,
-	)
-	return err
+func (r *GroupRepo) RemoveUserFromGroup(userID, groupID uuid.UUID, checkResultRepo repo.CheckResultRepo) error {
+	return util.WithTransaction(r.db.DB, func(tx *sql.Tx) error {
+
+		var checkID uuid.UUID
+		err := tx.QueryRow(`
+			SELECT id
+			FROM "Check"
+			WHERE group_id = $1
+		`, groupID).Scan(&checkID)
+		if err != nil {
+			return err
+		}
+
+		results, err := checkResultRepo.GetCheckResultsByCheckID(checkID)
+		if err != nil {
+			return err
+		}
+
+		for _, cr := range results {
+			if cr.UserID == userID {
+
+				if err := checkResultRepo.DeleteCheckResult(cr.ID); err != nil {
+					return err
+				}
+			}
+		}
+
+		_, err = tx.Exec(`
+			DELETE FROM user_to_group
+			WHERE user_id=$1 AND group_id=$2
+		`, userID, groupID)
+		return err
+	})
 }

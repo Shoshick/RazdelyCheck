@@ -2,6 +2,7 @@ package repo_impl
 
 import (
 	"context"
+	"database/sql"
 
 	"RazdelyCheck/internal/dto"
 	"RazdelyCheck/internal/repo"
@@ -55,12 +56,45 @@ func (r *checkRepo) ListByUserID(userID uuid.UUID) ([]*dto.Check, error) {
 	return checks, nil
 }
 
-func (r *checkRepo) UpdateTotalSum(id uuid.UUID, totalSum int64) error {
-	_, err := r.db.Exec(`
+func (r *checkRepo) UpdateTotalSum(id uuid.UUID) error {
+	var total int64
+	err := r.db.Get(&total, `
+		SELECT COALESCE(SUM(price * quantity),0)
+		FROM Item
+		WHERE check_id = $1 AND is_excluded = false
+	`, id)
+	if err != nil {
+		return err
+	}
+
+	_, err = r.db.Exec(`
 		UPDATE "Check"
 		SET total_sum = $2
 		WHERE id = $1
-	`, id, totalSum)
+	`, id, total)
+	return err
+}
+
+func (r *checkRepo) UpdateTotalSumTx(tx *sql.Tx, checkID uuid.UUID) error {
+	var total int64
+	err := tx.QueryRowContext(
+		context.Background(),
+		`SELECT COALESCE(SUM(price * quantity),0)
+		 FROM Item
+		 WHERE check_id = $1 AND is_excluded = false`,
+		checkID,
+	).Scan(&total)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.ExecContext(
+		context.Background(),
+		`UPDATE "Check"
+		 SET total_sum = $2
+		 WHERE id = $1`,
+		checkID, total,
+	)
 	return err
 }
 
@@ -71,4 +105,17 @@ func (r *checkRepo) Delete(id uuid.UUID) error {
 		id,
 	)
 	return err
+}
+
+func (r *checkRepo) GetCheckByGroupID(groupID uuid.UUID) (uuid.UUID, error) {
+	var checkID uuid.UUID
+	err := r.db.Get(&checkID, `
+		SELECT id
+		FROM "Check"
+		WHERE group_id = $1
+	`, groupID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return checkID, nil
 }

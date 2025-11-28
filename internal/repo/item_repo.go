@@ -2,6 +2,7 @@ package repo
 
 import (
 	"RazdelyCheck/internal/dto"
+	"database/sql"
 	"github.com/google/uuid"
 )
 
@@ -10,5 +11,9 @@ type ItemRepo interface {
 	GetByID(id uuid.UUID) (*dto.Item, error)
 	ListByCheckID(checkID uuid.UUID) ([]*dto.Item, error)
 	Update(i *dto.Item) error
+
+	ExcludeItemTx(tx *sql.Tx, id uuid.UUID) error
+	IncludeItemTx(tx *sql.Tx, id uuid.UUID) error
+	
 	Delete(id uuid.UUID) error
 }

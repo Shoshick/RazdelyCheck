@@ -94,7 +94,7 @@ func (s *CheckService) UpdateTotalSum(userID, checkID uuid.UUID, totalSum int64)
 		return nil, errors.New("forbidden")
 	}
 
-	err = s.checkRepo.UpdateTotalSum(checkID, totalSum)
+	err = s.checkRepo.UpdateTotalSum(checkID)
 	if err != nil {
 		return nil, err
 	}

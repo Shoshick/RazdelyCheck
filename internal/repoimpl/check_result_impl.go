@@ -96,29 +96,41 @@ func (r *checkResultRepoImpl) UpdateItemQuantityInCheckResult(itemID, checkResul
 	})
 }
 
-func (r *checkResultRepoImpl) RemoveItemFromCheckResult(itemID, checkResultID uuid.UUID) error {
+func (r *checkResultRepoImpl) RemoveItemFromCheckResult(
+	itemID, checkResultID uuid.UUID,
+) error {
+
 	return util.WithTransaction(r.db.DB, func(tx *sql.Tx) error {
-		_, err := tx.Exec(`
-			DELETE FROM public.item_to_check_result
-			WHERE item_id=$1 AND check_result_id=$2
-		`, itemID, checkResultID)
+
+		res, err := tx.Exec(`
+            DELETE FROM public.item_to_check_result
+            WHERE item_id = $1 AND check_result_id = $2
+        `, itemID, checkResultID)
 		if err != nil {
 			return err
 		}
-
+		affected, _ := res.RowsAffected()
+		if affected == 0 {
+		}
 		var total float64
 		err = tx.QueryRow(`
-			SELECT COALESCE(SUM(i.price * itcr.quantity),0)
-			FROM public.item_to_check_result itcr
-			JOIN public.item i ON i.id = itcr.item_id
-			WHERE itcr.check_result_id=$1
-		`, checkResultID).Scan(&total)
+            SELECT COALESCE(SUM(i.price * itcr.quantity), 0)
+            FROM public.item_to_check_result itcr
+            JOIN public.item i ON i.id = itcr.item_id
+            WHERE itcr.check_result_id = $1
+        `, checkResultID).Scan(&total)
 		if err != nil {
 			return err
 		}
-
-		_, err = tx.Exec(`UPDATE public.check_result SET total_due=$1 WHERE id=$2`, total, checkResultID)
-		return err
+		_, err = tx.Exec(`
+            UPDATE public.check_result
+            SET total_due = $1
+            WHERE id = $2
+        `, total, checkResultID)
+		if err != nil {
+			return err
+		}
+		return nil
 	})
 }
 
@@ -161,4 +173,67 @@ func (r *checkResultRepoImpl) UpdateCheckResultTotal(crID uuid.UUID) error {
 		WHERE id=$1
 	`, crID)
 	return err
+}
+
+func (r *checkResultRepoImpl) GetUsedQuantitiesByCheckIDTx(tx *sql.Tx, checkID uuid.UUID) (map[uuid.UUID]float64, error) {
+	rows, err := tx.Query(`
+		SELECT itcr.item_id, SUM(itcr.quantity)
+		FROM public.item_to_check_result itcr
+		JOIN public.check_result cr ON cr.id = itcr.check_result_id
+		WHERE cr.check_id = $1
+		GROUP BY itcr.item_id
+	`, checkID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	result := make(map[uuid.UUID]float64)
+	for rows.Next() {
+		var itemID uuid.UUID
+		var qty float64
+		if err := rows.Scan(&itemID, &qty); err != nil {
+			return nil, err
+		}
+		result[itemID] = qty
+	}
+
+	return result, nil
+}
+
+func (r *checkResultRepoImpl) AddItemToCheckResultTx(tx *sql.Tx, itemID, checkResultID uuid.UUID, qty float64) error {
+	_, err := tx.Exec(`
+		INSERT INTO public.item_to_check_result (id, item_id, check_result_id, quantity)
+		VALUES ($1, $2, $3, $4)
+	`, uuid.New(), itemID, checkResultID, qty)
+
+	return err
+}
+
+func (r *checkResultRepoImpl) UpdateTotalDueTx(tx *sql.Tx, checkResultID uuid.UUID, total float64) error {
+	_, err := tx.Exec(`
+		UPDATE public.check_result
+		SET total_due = $1
+		WHERE id = $2
+	`, total, checkResultID)
+
+	return err
+}
+
+func (r *checkResultRepoImpl) GetTotalSumByCheckResultID(checkResultID uuid.UUID) (int64, error) {
+	var total int64
+
+	query := `
+        SELECT COALESCE(SUM((i.price * itcr.quantity) * 100)::bigint, 0)
+        FROM item_to_check_result itcr
+        JOIN item i ON i.id = itcr.item_id
+        WHERE itcr.check_result_id = $1
+    `
+
+	err := r.db.Get(&total, query, checkResultID)
+	if err != nil {
+		return 0, err
+	}
+
+	return total, nil
 }

@@ -15,6 +15,7 @@ type CheckRepo interface {
 	ListByUserID(id uuid.UUID) ([]*dto.Check, error)
 
 	UpdateTotalSumTx(tx *sql.Tx, checkID uuid.UUID) error
+	GetCheckByIDTx(tx *sql.Tx, id uuid.UUID) (*dto.Check, error)
 
 	Delete(id uuid.UUID) error
 }

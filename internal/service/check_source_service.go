@@ -23,11 +23,13 @@ type CheckSourceService struct {
 	token        string       // <-- токен вынесем в конфиг
 }
 
-func NewCheckSourceService(r repo.CheckSourceRepo, db *sql.DB, cs *CheckService) *CheckSourceService {
+func NewCheckSourceService(r repo.CheckSourceRepo, db *sql.DB, cs *CheckService, token string) *CheckSourceService {
 	return &CheckSourceService{
 		repo:         r,
 		db:           db,
 		checkService: cs,
+		httpClient:   &http.Client{},
+		token:        token,
 	}
 }
 

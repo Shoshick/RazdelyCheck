@@ -3,6 +3,7 @@ package repo_impl
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"RazdelyCheck/internal/dto"
 	"RazdelyCheck/internal/repo"
@@ -40,6 +41,22 @@ func (r *checkRepo) GetByID(id uuid.UUID) (*dto.Check, error) {
 		return nil, err
 	}
 	return c, nil
+}
+
+func (r *checkRepo) GetCheckByIDTx(tx *sql.Tx, id uuid.UUID) (*dto.Check, error) {
+	var ch dto.Check
+	err := tx.QueryRow(`
+		SELECT id, user_id, total_sum
+		FROM public."Check"
+		WHERE id=$1
+	`, id).Scan(&ch.ID, &ch.UserID, &ch.TotalSum)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("check not found")
+		}
+		return nil, err
+	}
+	return &ch, nil
 }
 
 func (r *checkRepo) ListByUserID(userID uuid.UUID) ([]*dto.Check, error) {

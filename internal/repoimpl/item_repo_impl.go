@@ -95,3 +95,25 @@ func (r *itemRepo) IncludeItemTx(tx *sql.Tx, id uuid.UUID) error {
 	)
 	return err
 }
+
+func (r *itemRepo) GetItemsByCheckIDTx(tx *sql.Tx, checkID uuid.UUID) ([]*dto.Item, error) {
+	rows, err := tx.Query(`
+		SELECT id, check_id, position, name, price, quantity
+		FROM public.item
+		WHERE check_id=$1
+	`, checkID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []*dto.Item
+	for rows.Next() {
+		it := &dto.Item{}
+		if err := rows.Scan(&it.ID, &it.CheckID, &it.Position, &it.Name, &it.Price, &it.Quantity); err != nil {
+			return nil, err
+		}
+		items = append(items, it)
+	}
+	return items, nil
+}

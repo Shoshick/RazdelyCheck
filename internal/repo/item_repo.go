@@ -14,6 +14,7 @@ type ItemRepo interface {
 
 	ExcludeItemTx(tx *sql.Tx, id uuid.UUID) error
 	IncludeItemTx(tx *sql.Tx, id uuid.UUID) error
-	
+	GetItemsByCheckIDTx(tx *sql.Tx, checkID uuid.UUID) ([]*dto.Item, error)
+
 	Delete(id uuid.UUID) error
 }

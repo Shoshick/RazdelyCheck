@@ -14,6 +14,8 @@ type UserRepo interface {
 	UpdateName(id uuid.UUID, name string) error
 	UpdateEmail(id uuid.UUID, email string) error
 	UpdateOwner(id uuid.UUID, ownerID uuid.UUID) error
+	GetOwnerForTempUser(tempUserID uuid.UUID) (uuid.UUID, error)
 
 	Delete(id uuid.UUID) error
+	DeleteByOwner(ownerID uuid.UUID) error
 }

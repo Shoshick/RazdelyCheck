@@ -81,9 +81,52 @@ func (s *UserService) Update(u *dto.User) error {
 	return nil
 }
 
+func (s *UserService) ListOwnedUsers(ownerID uuid.UUID) ([]*dto.User, error) {
+	if ownerID == uuid.Nil {
+		return nil, errors.New("не указан ownerID")
+	}
+	return s.repo.ListByOwner(ownerID)
+}
+
+func (s *UserService) MakePermanent(tempUserID uuid.UUID) error {
+	if tempUserID == uuid.Nil {
+		return errors.New("не указан tempUserID")
+	}
+
+	user, err := s.repo.GetByID(tempUserID)
+	if err != nil {
+		return err
+	}
+
+	if user.OwnerID != nil && *user.OwnerID != uuid.Nil {
+		return errors.New("пользователь уже сохранён")
+	}
+
+	ownerID, err := s.repo.GetOwnerForTempUser(tempUserID)
+	if err != nil {
+		return err
+	}
+
+	return s.repo.UpdateOwner(tempUserID, ownerID)
+}
+
 func (s *UserService) Delete(id uuid.UUID) error {
 	if id == uuid.Nil {
 		return errors.New("не указан ID пользователя")
 	}
+	return s.repo.Delete(id)
+}
+
+func (s *UserService) DeleteUserWithOwned(id uuid.UUID) error {
+	if id == uuid.Nil {
+		return errors.New("не указан ID пользователя")
+	}
+
+	// удаляем всех, кого владелец создал
+	if err := s.repo.DeleteByOwner(id); err != nil {
+		return err
+	}
+
+	// удаляем самого пользователя
 	return s.repo.Delete(id)
 }

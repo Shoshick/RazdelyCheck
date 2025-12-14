@@ -88,11 +88,33 @@ func (r *userRepo) UpdateOwner(id uuid.UUID, ownerID uuid.UUID) error {
 	return err
 }
 
+func (r *userRepo) GetOwnerForTempUser(tempUserID uuid.UUID) (uuid.UUID, error) {
+	var ownerID uuid.UUID
+	err := r.db.Get(&ownerID, `
+		SELECT c.user_id
+		FROM "Check" c
+		JOIN "Group" g ON c.group_id = g.id
+		JOIN "user_to_group" gu ON gu.group_id = g.id
+		WHERE gu.user_id = $1
+		LIMIT 1
+	`, tempUserID)
+	return ownerID, err
+}
+
 func (r *userRepo) Delete(id uuid.UUID) error {
 	_, err := r.db.ExecContext(
 		context.Background(),
 		`DELETE FROM "User" WHERE id=$1`,
 		id,
+	)
+	return err
+}
+
+func (r *userRepo) DeleteByOwner(ownerID uuid.UUID) error {
+	_, err := r.db.ExecContext(
+		context.Background(),
+		`DELETE FROM "User" WHERE owner = $1`,
+		ownerID,
 	)
 	return err
 }

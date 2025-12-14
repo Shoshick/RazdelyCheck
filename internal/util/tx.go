@@ -1,25 +1,18 @@
 package util
 
 import (
-	"context"
-	"database/sql"
+	"github.com/jmoiron/sqlx"
 )
 
-func WithTransaction(db *sql.DB, fn func(tx *sql.Tx) error) error {
-	tx, err := db.BeginTx(context.Background(), nil)
+// Функция для выполнения транзакции с sqlx
+func WithTransaction(db *sqlx.DB, fn func(*sqlx.Tx) error) error {
+	tx, err := db.Beginx()
 	if err != nil {
 		return err
 	}
-	
-	defer func() {
-		if p := recover(); p != nil {
-			_ = tx.Rollback()
-			panic(p)
-		}
-	}()
 
 	if err := fn(tx); err != nil {
-		_ = tx.Rollback()
+		tx.Rollback()
 		return err
 	}
 

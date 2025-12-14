@@ -4,7 +4,6 @@ import (
 	"RazdelyCheck/internal/dto"
 	"RazdelyCheck/internal/repo"
 	"RazdelyCheck/internal/util"
-	"database/sql"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )
@@ -17,7 +16,7 @@ func NewCheckResultRepo(db *sqlx.DB) repo.CheckResultRepo {
 	return &checkResultRepoImpl{db: db}
 }
 
-func (r *checkResultRepoImpl) CreateCheckResultTx(tx *sql.Tx, cr *dto.CheckResult) error {
+func (r *checkResultRepoImpl) CreateCheckResultTx(tx *sqlx.Tx, cr *dto.CheckResult) error {
 	_, err := tx.Exec(`
 		INSERT INTO public.check_result (id, check_id, user_id, total_due)
 		VALUES ($1, $2, $3, $4)
@@ -44,7 +43,7 @@ func (r *checkResultRepoImpl) GetCheckResultsByCheckID(checkID uuid.UUID) ([]dto
 }
 
 func (r *checkResultRepoImpl) AddItemToCheckResult(item *dto.ItemToCheckResult) error {
-	return util.WithTransaction(r.db.DB, func(tx *sql.Tx) error {
+	return util.WithTransaction(r.db, func(tx *sqlx.Tx) error {
 		_, err := tx.Exec(`
 			INSERT INTO public.item_to_check_result (id, item_id, check_result_id, quantity)
 			VALUES ($1, $2, $3, $4)
@@ -54,12 +53,12 @@ func (r *checkResultRepoImpl) AddItemToCheckResult(item *dto.ItemToCheckResult) 
 		}
 
 		var total float64
-		err = tx.QueryRow(`
+		err = tx.Get(&total, `
 			SELECT COALESCE(SUM(i.price * itcr.quantity),0)
 			FROM public.item_to_check_result itcr
 			JOIN public.item i ON i.id = itcr.item_id
 			WHERE itcr.check_result_id=$1
-		`, item.CheckResultID).Scan(&total)
+		`, item.CheckResultID)
 		if err != nil {
 			return err
 		}
@@ -70,7 +69,7 @@ func (r *checkResultRepoImpl) AddItemToCheckResult(item *dto.ItemToCheckResult) 
 }
 
 func (r *checkResultRepoImpl) UpdateItemQuantityInCheckResult(itemID, checkResultID uuid.UUID, quantity float64) error {
-	return util.WithTransaction(r.db.DB, func(tx *sql.Tx) error {
+	return util.WithTransaction(r.db, func(tx *sqlx.Tx) error {
 		_, err := tx.Exec(`
 			UPDATE public.item_to_check_result
 			SET quantity=$1
@@ -81,12 +80,12 @@ func (r *checkResultRepoImpl) UpdateItemQuantityInCheckResult(itemID, checkResul
 		}
 
 		var total float64
-		err = tx.QueryRow(`
+		err = tx.Get(&total, `
 			SELECT COALESCE(SUM(i.price * itcr.quantity),0)
 			FROM public.item_to_check_result itcr
 			JOIN public.item i ON i.id = itcr.item_id
 			WHERE itcr.check_result_id=$1
-		`, checkResultID).Scan(&total)
+		`, checkResultID)
 		if err != nil {
 			return err
 		}
@@ -100,7 +99,7 @@ func (r *checkResultRepoImpl) RemoveItemFromCheckResult(
 	itemID, checkResultID uuid.UUID,
 ) error {
 
-	return util.WithTransaction(r.db.DB, func(tx *sql.Tx) error {
+	return util.WithTransaction(r.db, func(tx *sqlx.Tx) error {
 
 		res, err := tx.Exec(`
             DELETE FROM public.item_to_check_result
@@ -113,12 +112,12 @@ func (r *checkResultRepoImpl) RemoveItemFromCheckResult(
 		if affected == 0 {
 		}
 		var total float64
-		err = tx.QueryRow(`
+		err = tx.Get(&total, `
             SELECT COALESCE(SUM(i.price * itcr.quantity), 0)
             FROM public.item_to_check_result itcr
             JOIN public.item i ON i.id = itcr.item_id
             WHERE itcr.check_result_id = $1
-        `, checkResultID).Scan(&total)
+        `, checkResultID)
 		if err != nil {
 			return err
 		}
@@ -135,28 +134,14 @@ func (r *checkResultRepoImpl) RemoveItemFromCheckResult(
 }
 
 func (r *checkResultRepoImpl) GetItemsByCheckResultID(checkResultID uuid.UUID) ([]dto.ItemToCheckResult, error) {
-	rows, err := r.db.Query(`
+	var items []dto.ItemToCheckResult
+	err := r.db.Select(&items, `
 		SELECT id, item_id, check_result_id, quantity
 		FROM public.item_to_check_result
 		WHERE check_result_id=$1
 	`, checkResultID)
 	if err != nil {
 		return nil, err
-	}
-	defer func(rows *sql.Rows) {
-		err := rows.Close()
-		if err != nil {
-
-		}
-	}(rows)
-
-	var items []dto.ItemToCheckResult
-	for rows.Next() {
-		var it dto.ItemToCheckResult
-		if err := rows.Scan(&it.ID, &it.ItemID, &it.CheckResultID, &it.Quantity); err != nil {
-			return nil, err
-		}
-		items = append(items, it)
 	}
 	return items, nil
 }
@@ -175,9 +160,14 @@ func (r *checkResultRepoImpl) UpdateCheckResultTotal(crID uuid.UUID) error {
 	return err
 }
 
-func (r *checkResultRepoImpl) GetUsedQuantitiesByCheckIDTx(tx *sql.Tx, checkID uuid.UUID) (map[uuid.UUID]float64, error) {
-	rows, err := tx.Query(`
-		SELECT itcr.item_id, SUM(itcr.quantity)
+func (r *checkResultRepoImpl) GetUsedQuantitiesByCheckIDTx(tx *sqlx.Tx, checkID uuid.UUID) (map[uuid.UUID]float64, error) {
+	type row struct {
+		ItemID uuid.UUID `db:"item_id"`
+		Qty    float64   `db:"qty"`
+	}
+	var rows []row
+	err := tx.Select(&rows, `
+		SELECT itcr.item_id, SUM(itcr.quantity) as qty
 		FROM public.item_to_check_result itcr
 		JOIN public.check_result cr ON cr.id = itcr.check_result_id
 		WHERE cr.check_id = $1
@@ -186,22 +176,16 @@ func (r *checkResultRepoImpl) GetUsedQuantitiesByCheckIDTx(tx *sql.Tx, checkID u
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
 	result := make(map[uuid.UUID]float64)
-	for rows.Next() {
-		var itemID uuid.UUID
-		var qty float64
-		if err := rows.Scan(&itemID, &qty); err != nil {
-			return nil, err
-		}
-		result[itemID] = qty
+	for _, r := range rows {
+		result[r.ItemID] = r.Qty
 	}
 
 	return result, nil
 }
 
-func (r *checkResultRepoImpl) AddItemToCheckResultTx(tx *sql.Tx, itemID, checkResultID uuid.UUID, qty float64) error {
+func (r *checkResultRepoImpl) AddItemToCheckResultTx(tx *sqlx.Tx, itemID, checkResultID uuid.UUID, qty float64) error {
 	_, err := tx.Exec(`
 		INSERT INTO public.item_to_check_result (id, item_id, check_result_id, quantity)
 		VALUES ($1, $2, $3, $4)
@@ -210,7 +194,7 @@ func (r *checkResultRepoImpl) AddItemToCheckResultTx(tx *sql.Tx, itemID, checkRe
 	return err
 }
 
-func (r *checkResultRepoImpl) UpdateTotalDueTx(tx *sql.Tx, checkResultID uuid.UUID, total float64) error {
+func (r *checkResultRepoImpl) UpdateTotalDueTx(tx *sqlx.Tx, checkResultID uuid.UUID, total float64) error {
 	_, err := tx.Exec(`
 		UPDATE public.check_result
 		SET total_due = $1

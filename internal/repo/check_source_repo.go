@@ -2,13 +2,13 @@ package repo
 
 import (
 	"RazdelyCheck/internal/dto"
-	"database/sql"
 	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
 )
 
 type CheckSourceRepo interface {
 	Create(cs *dto.CheckSource) error
 	GetByCheckID(checkID uuid.UUID) (*dto.CheckSource, error)
-	CreateTx(tx *sql.Tx, cs *dto.CheckSource) error
-	CreateItemTx(tx *sql.Tx, item *dto.Item) error
+	CreateTx(tx *sqlx.Tx, cs *dto.CheckSource) error
+	CreateItemTx(tx *sqlx.Tx, item *dto.Item) error
 }

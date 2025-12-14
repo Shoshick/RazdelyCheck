@@ -2,8 +2,8 @@ package repo
 
 import (
 	"RazdelyCheck/internal/dto"
-	"database/sql"
 	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
 )
 
 type CheckRepo interface {
@@ -14,8 +14,8 @@ type CheckRepo interface {
 	UpdateTotalSum(id uuid.UUID) error
 	ListByUserID(id uuid.UUID) ([]*dto.Check, error)
 
-	UpdateTotalSumTx(tx *sql.Tx, checkID uuid.UUID) error
-	GetCheckByIDTx(tx *sql.Tx, id uuid.UUID) (*dto.Check, error)
+	UpdateTotalSumTx(tx *sqlx.Tx, checkID uuid.UUID) error
+	GetCheckByIDTx(tx *sqlx.Tx, id uuid.UUID) (*dto.Check, error)
 
 	Delete(id uuid.UUID) error
 }

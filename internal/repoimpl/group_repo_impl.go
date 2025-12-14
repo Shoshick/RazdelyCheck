@@ -5,7 +5,6 @@ import (
 	"RazdelyCheck/internal/repo"
 	"RazdelyCheck/internal/util"
 	"context"
-	"database/sql"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -106,7 +105,7 @@ func (r *GroupRepo) ExistsUserInGroup(userID, groupID uuid.UUID) (bool, error) {
 
 // AddUserToGroup теперь без лишнего параметра
 func (r *GroupRepo) AddUserToGroup(userID, groupID uuid.UUID) error {
-	return util.WithTransaction(r.db.DB, func(tx *sql.Tx) error {
+	return util.WithTransaction(r.db, func(tx *sqlx.Tx) error {
 		_, err := tx.Exec(`
 			INSERT INTO user_to_group (id, group_id, user_id)
 			VALUES ($1, $2, $3)
@@ -116,7 +115,7 @@ func (r *GroupRepo) AddUserToGroup(userID, groupID uuid.UUID) error {
 		}
 
 		var checkID uuid.UUID
-		err = tx.QueryRow(`SELECT id FROM "Check" WHERE group_id = $1`, groupID).Scan(&checkID)
+		err = tx.Get(&checkID, `SELECT id FROM "Check" WHERE group_id = $1`, groupID)
 		if err != nil {
 			return err
 		}
@@ -133,9 +132,9 @@ func (r *GroupRepo) AddUserToGroup(userID, groupID uuid.UUID) error {
 
 // RemoveUserFromGroup без лишнего параметра
 func (r *GroupRepo) RemoveUserFromGroup(userID, groupID uuid.UUID) error {
-	return util.WithTransaction(r.db.DB, func(tx *sql.Tx) error {
+	return util.WithTransaction(r.db, func(tx *sqlx.Tx) error {
 		var checkID uuid.UUID
-		err := tx.QueryRow(`SELECT id FROM "Check" WHERE group_id = $1`, groupID).Scan(&checkID)
+		err := tx.Get(&checkID, `SELECT id FROM "Check" WHERE group_id = $1`, groupID)
 		if err != nil {
 			return err
 		}

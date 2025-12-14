@@ -43,13 +43,13 @@ func (r *checkRepo) GetByID(id uuid.UUID) (*dto.Check, error) {
 	return c, nil
 }
 
-func (r *checkRepo) GetCheckByIDTx(tx *sql.Tx, id uuid.UUID) (*dto.Check, error) {
+func (r *checkRepo) GetCheckByIDTx(tx *sqlx.Tx, id uuid.UUID) (*dto.Check, error) {
 	var ch dto.Check
-	err := tx.QueryRow(`
+	err := tx.Get(&ch, `
 		SELECT id, user_id, total_sum
 		FROM public."Check"
 		WHERE id=$1
-	`, id).Scan(&ch.ID, &ch.UserID, &ch.TotalSum)
+	`, id)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("check not found")
@@ -92,15 +92,16 @@ func (r *checkRepo) UpdateTotalSum(id uuid.UUID) error {
 	return err
 }
 
-func (r *checkRepo) UpdateTotalSumTx(tx *sql.Tx, checkID uuid.UUID) error {
+func (r *checkRepo) UpdateTotalSumTx(tx *sqlx.Tx, checkID uuid.UUID) error {
 	var total int64
-	err := tx.QueryRowContext(
+	err := tx.GetContext(
 		context.Background(),
+		&total,
 		`SELECT COALESCE(SUM(price * quantity),0)
 		 FROM Item
 		 WHERE check_id = $1 AND is_excluded = false`,
 		checkID,
-	).Scan(&total)
+	)
 	if err != nil {
 		return err
 	}

@@ -2,12 +2,12 @@ package repo
 
 import (
 	"RazdelyCheck/internal/dto"
-	"database/sql"
 	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
 )
 
 type CheckResultRepo interface {
-	CreateCheckResultTx(tx *sql.Tx, cr *dto.CheckResult) error
+	CreateCheckResultTx(tx *sqlx.Tx, cr *dto.CheckResult) error
 	DeleteCheckResult(id uuid.UUID) error
 	GetCheckResultsByCheckID(checkID uuid.UUID) ([]dto.CheckResult, error)
 
@@ -17,9 +17,9 @@ type CheckResultRepo interface {
 	GetItemsByCheckResultID(checkResultID uuid.UUID) ([]dto.ItemToCheckResult, error)
 	GetTotalSumByCheckResultID(checkResultID uuid.UUID) (int64, error)
 
-	GetUsedQuantitiesByCheckIDTx(tx *sql.Tx, checkID uuid.UUID) (map[uuid.UUID]float64, error)
-	AddItemToCheckResultTx(tx *sql.Tx, itemID, checkResultID uuid.UUID, qty float64) error
-	UpdateTotalDueTx(tx *sql.Tx, checkResultID uuid.UUID, total float64) error
+	GetUsedQuantitiesByCheckIDTx(tx *sqlx.Tx, checkID uuid.UUID) (map[uuid.UUID]float64, error)
+	AddItemToCheckResultTx(tx *sqlx.Tx, itemID, checkResultID uuid.UUID, qty float64) error
+	UpdateTotalDueTx(tx *sqlx.Tx, checkResultID uuid.UUID, total float64) error
 
 	UpdateCheckResultTotal(crID uuid.UUID) error
 }

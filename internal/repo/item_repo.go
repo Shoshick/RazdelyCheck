@@ -2,8 +2,8 @@ package repo
 
 import (
 	"RazdelyCheck/internal/dto"
-	"database/sql"
 	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
 )
 
 type ItemRepo interface {
@@ -12,9 +12,9 @@ type ItemRepo interface {
 	ListByCheckID(checkID uuid.UUID) ([]*dto.Item, error)
 	Update(i *dto.Item) error
 
-	ExcludeItemTx(tx *sql.Tx, id uuid.UUID) error
-	IncludeItemTx(tx *sql.Tx, id uuid.UUID) error
-	GetItemsByCheckIDTx(tx *sql.Tx, checkID uuid.UUID) ([]*dto.Item, error)
+	ExcludeItemTx(tx *sqlx.Tx, id uuid.UUID) error
+	IncludeItemTx(tx *sqlx.Tx, id uuid.UUID) error
+	GetItemsByCheckIDTx(tx *sqlx.Tx, checkID uuid.UUID) ([]*dto.Item, error)
 
 	Delete(id uuid.UUID) error
 }

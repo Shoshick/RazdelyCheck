@@ -4,7 +4,6 @@ import (
 	"RazdelyCheck/internal/dto"
 	"RazdelyCheck/internal/repo"
 	"context"
-	"database/sql"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -78,7 +77,7 @@ func (r *itemRepo) Delete(id uuid.UUID) error {
 	return err
 }
 
-func (r *itemRepo) ExcludeItemTx(tx *sql.Tx, id uuid.UUID) error {
+func (r *itemRepo) ExcludeItemTx(tx *sqlx.Tx, id uuid.UUID) error {
 	_, err := tx.ExecContext(
 		context.Background(),
 		`UPDATE Item SET is_excluded = true WHERE id=$1`,
@@ -87,7 +86,7 @@ func (r *itemRepo) ExcludeItemTx(tx *sql.Tx, id uuid.UUID) error {
 	return err
 }
 
-func (r *itemRepo) IncludeItemTx(tx *sql.Tx, id uuid.UUID) error {
+func (r *itemRepo) IncludeItemTx(tx *sqlx.Tx, id uuid.UUID) error {
 	_, err := tx.ExecContext(
 		context.Background(),
 		`UPDATE Item SET is_excluded = false WHERE id=$1`,
@@ -96,24 +95,15 @@ func (r *itemRepo) IncludeItemTx(tx *sql.Tx, id uuid.UUID) error {
 	return err
 }
 
-func (r *itemRepo) GetItemsByCheckIDTx(tx *sql.Tx, checkID uuid.UUID) ([]*dto.Item, error) {
-	rows, err := tx.Query(`
+func (r *itemRepo) GetItemsByCheckIDTx(tx *sqlx.Tx, checkID uuid.UUID) ([]*dto.Item, error) {
+	var items []*dto.Item
+	err := tx.Select(&items, `
 		SELECT id, check_id, position, name, price, quantity
 		FROM public.item
 		WHERE check_id=$1
 	`, checkID)
 	if err != nil {
 		return nil, err
-	}
-	defer rows.Close()
-
-	var items []*dto.Item
-	for rows.Next() {
-		it := &dto.Item{}
-		if err := rows.Scan(&it.ID, &it.CheckID, &it.Position, &it.Name, &it.Price, &it.Quantity); err != nil {
-			return nil, err
-		}
-		items = append(items, it)
 	}
 	return items, nil
 }

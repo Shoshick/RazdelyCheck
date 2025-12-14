@@ -4,11 +4,11 @@ import (
 	"RazdelyCheck/internal/dto"
 	"RazdelyCheck/internal/repo"
 	"RazdelyCheck/internal/util"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
 	"io"
 	"net/http"
 	"net/url"
@@ -17,13 +17,13 @@ import (
 
 type CheckSourceService struct {
 	repo         repo.CheckSourceRepo
-	db           *sql.DB
+	db           *sqlx.DB
 	checkService *CheckService
 	httpClient   *http.Client // <-- пригодится
 	token        string       // <-- токен вынесем в конфиг
 }
 
-func NewCheckSourceService(r repo.CheckSourceRepo, db *sql.DB, cs *CheckService, token string) *CheckSourceService {
+func NewCheckSourceService(r repo.CheckSourceRepo, db *sqlx.DB, cs *CheckService, token string) *CheckSourceService {
 	return &CheckSourceService{
 		repo:         r,
 		db:           db,
@@ -47,7 +47,7 @@ func (s *CheckSourceService) ProcessQR(userID uuid.UUID, input dto.QRScanInput, 
 	var items []dto.Item
 	var totalSum int64
 
-	err = util.WithTransaction(s.db, func(tx *sql.Tx) error {
+	err = util.WithTransaction(s.db, func(tx *sqlx.Tx) error {
 
 		items, totalSum, err = ParseCheckJSON(jsonData, uuid.Nil)
 		if err != nil {

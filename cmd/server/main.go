@@ -15,13 +15,12 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/joho/godotenv"
 
-	"database/sql"
 	_ "github.com/lib/pq"
 )
 
 func main() {
 	// Загружаем переменные окружения из .env
-	if err := godotenv.Load(); err != nil {
+	if err := godotenv.Load("../.env"); err != nil {
 		log.Println("No .env file found, using system environment variables")
 	}
 
@@ -52,7 +51,7 @@ func main() {
 	userService := service.NewUserService(userRepo)
 	groupService := service.NewGroupService(groupRepo, userRepo)
 	checkService := service.NewCheckService(checkRepo, groupRepo)
-	itemService := service.NewItemService(itemRepo, checkRepo)
+	itemService := service.NewItemService(itemRepo, checkRepo, db)
 	checkSourceService := service.NewCheckSourceService(
 		checkSourceRepo,
 		db,
@@ -73,17 +72,17 @@ func main() {
 	r := chi.NewRouter()
 
 	// Middleware
-	r.Use(middleware.Logging)
+	r.Use(middleware.Logger)
 	r.Use(middleware.Recovery)
 	r.Use(middleware.Auth)
 
 	// Подключаем роутеры
-	router.NewUserRouter(r, userHandler)
-	router.NewGroupRouter(r, groupHandler)
-	router.NewCheckRouter(r, checkHandler)
-	router.NewItemRouter(r, itemHandler)
-	router.NewCheckSourceRouter(r, checkSourceHandler)
-	router.NewCheckResultRouter(r, checkResultHandler) // новый роутер
+	r.Mount("/", router.NewUserRouter(userHandler))
+	r.Mount("/", router.NewGroupRouter(groupHandler))
+	r.Mount("/", router.NewCheckRouter(checkHandler))
+	r.Mount("/", router.NewItemRouter(itemHandler))
+	r.Mount("/", router.NewCheckSourceRouter(checkSourceHandler))
+	r.Mount("/", router.NewCheckResultRouter(checkResultHandler)) // новый роутер
 
 	port := os.Getenv("PORT")
 	if port == "" {

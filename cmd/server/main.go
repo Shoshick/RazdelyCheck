@@ -7,7 +7,7 @@ import (
 
 	"RazdelyCheck/internal/handler"
 	"RazdelyCheck/internal/middleware"
-	"RazdelyCheck/internal/repoimpl"
+	repoimpl "RazdelyCheck/internal/repoimpl"
 	"RazdelyCheck/internal/router"
 	"RazdelyCheck/internal/service"
 
@@ -19,35 +19,31 @@ import (
 )
 
 func main() {
-	// Загружаем переменные окружения из .env
-	if err := godotenv.Load("../.env"); err != nil {
+
+	if err := godotenv.Load(".env"); err != nil {
 		log.Println("No .env file found, using system environment variables")
 	}
 
-	dbHost := os.Getenv("DB_HOST")
-	dbPort := os.Getenv("DB_PORT")
-	dbUser := os.Getenv("DB_USER")
-	dbPassword := os.Getenv("DB_PASSWORD")
-	dbName := os.Getenv("DB_NAME")
-	dbSSL := os.Getenv("DB_SSLMODE")
-
-	dsn := "postgres://" + dbUser + ":" + dbPassword + "@" + dbHost + ":" + dbPort + "/" + dbName + "?sslmode=" + dbSSL
+	dsn := "postgres://" +
+		os.Getenv("DB_USER") + ":" +
+		os.Getenv("DB_PASSWORD") + "@" +
+		os.Getenv("DB_HOST") + ":" +
+		os.Getenv("DB_PORT") + "/" +
+		os.Getenv("DB_NAME") +
+		"?sslmode=" + os.Getenv("DB_SSLMODE")
 
 	db, err := sqlx.Connect("postgres", dsn)
 	if err != nil {
 		log.Fatalf("Failed to connect to DB: %v", err)
 	}
 
-	// Репозитории
-	userRepo := repo_impl.NewUserRepo(db)
-	checkResultRepo := repo_impl.NewCheckResultRepo(db)
-	groupRepo := repo_impl.NewGroupRepo(db, checkResultRepo)
-	itemRepo := repo_impl.NewItemRepo(db)
-	checkRepo := repo_impl.NewCheckRepo(db)
-	checkSourceRepo := repo_impl.NewCheckSourceRepo(db)
-	// новый репо
+	userRepo := repoimpl.NewUserRepo(db)
+	checkResultRepo := repoimpl.NewCheckResultRepo(db)
+	groupRepo := repoimpl.NewGroupRepo(db, checkResultRepo)
+	itemRepo := repoimpl.NewItemRepo(db)
+	checkRepo := repoimpl.NewCheckRepo(db)
+	checkSourceRepo := repoimpl.NewCheckSourceRepo(db)
 
-	// Сервисы
 	userService := service.NewUserService(userRepo)
 	groupService := service.NewGroupService(groupRepo, userRepo)
 	checkService := service.NewCheckService(checkRepo, groupRepo)
@@ -58,31 +54,27 @@ func main() {
 		checkService,
 		os.Getenv("CHECK_API_TOKEN"),
 	)
-	checkResultService := service.NewCheckResultService(checkResultRepo, db) // новый сервис
+	checkResultService := service.NewCheckResultService(checkResultRepo, db)
 
-	// Хендлеры
 	userHandler := handler.NewUserHandler(userService)
 	groupHandler := handler.NewGroupHandler(groupService)
 	checkHandler := handler.NewCheckHandler(checkService)
 	itemHandler := handler.NewItemHandler(itemService)
 	checkSourceHandler := handler.NewCheckSourceHandler(checkSourceService)
-	checkResultHandler := handler.NewCheckResultHandler(checkResultService) // новый хендлер
+	checkResultHandler := handler.NewCheckResultHandler(checkResultService)
 
-	// Роутер
 	r := chi.NewRouter()
 
-	// Middleware
-	r.Use(middleware.Logger)
+	r.Use(middleware.Logging)
 	r.Use(middleware.Recovery)
 	r.Use(middleware.Auth)
 
-	// Подключаем роутеры
-	r.Mount("/", router.NewUserRouter(userHandler))
-	r.Mount("/", router.NewGroupRouter(groupHandler))
-	r.Mount("/", router.NewCheckRouter(checkHandler))
-	r.Mount("/", router.NewItemRouter(itemHandler))
-	r.Mount("/", router.NewCheckSourceRouter(checkSourceHandler))
-	r.Mount("/", router.NewCheckResultRouter(checkResultHandler)) // новый роутер
+	router.NewUserRouter(r, userHandler)
+	router.NewGroupRouter(r, groupHandler)
+	router.NewCheckRouter(r, checkHandler)
+	router.NewItemRouter(r, itemHandler)
+	router.NewCheckSourceRouter(r, checkSourceHandler)
+	router.NewCheckResultRouter(r, checkResultHandler)
 
 	port := os.Getenv("PORT")
 	if port == "" {

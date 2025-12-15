@@ -4,26 +4,23 @@ import (
 	"RazdelyCheck/internal/handler"
 
 	"github.com/go-chi/chi/v5"
-	"net/http"
 )
 
-func NewGroupRouter(h *handler.GroupHandler) http.Handler {
-	r := chi.NewRouter()
+func NewGroupRouter(r chi.Router, h *handler.GroupHandler) {
+	r.Route("/groups", func(r chi.Router) {
+		// CRUD
+		r.Post("/", h.CreateGroup)
+		r.Get("/", h.ListGroups)
+		r.Get("/{id}", h.GetGroup)
+		r.Put("/{id}", h.UpdateGroup)
+		r.Delete("/{id}", h.DeleteGroup)
 
-	// CRUD группы
-	r.Post("/", h.CreateGroup)       // POST /groups
-	r.Get("/", h.ListGroups)         // GET /groups
-	r.Get("/{id}", h.GetGroup)       // GET /groups/{id}
-	r.Put("/{id}", h.UpdateGroup)    // PUT /groups/{id}
-	r.Delete("/{id}", h.DeleteGroup) // DELETE /groups/{id}
+		// Users in group
+		r.Post("/{id}/users", h.AddUser)
+		r.Delete("/{id}/users/{userID}", h.RemoveUser)
+		r.Get("/{id}/users", h.ListUsersByGroup)
 
-	// Пользователи в группе
-	r.Post("/{id}/users", h.AddUser)               // POST /groups/{id}/users
-	r.Delete("/{id}/users/{userID}", h.RemoveUser) // DELETE /groups/{id}/users/{userID}
-	r.Get("/{id}/users", h.ListUsersByGroup)       // GET /groups/{id}/users
-
-	// Списки групп по пользователю
-	r.Get("/user/{userID}", h.ListGroupsByUser) // GET /groups/user/{userID}
-
-	return r
+		// Groups by user
+		r.Get("/user/{userID}", h.ListGroupsByUser)
+	})
 }

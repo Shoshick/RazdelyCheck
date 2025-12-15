@@ -6,14 +6,12 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func NewUserRouter(h *handler.UserHandler) chi.Router {
-	r := chi.NewRouter()
-
-	r.Post("/", h.CreateUser)                       // POST /users
-	r.Put("/{id}", h.UpdateUser)                    // PUT /users/{id}
-	r.Get("/owned", h.ListOwnedUsers)               // GET /users/owned
-	r.Post("/{id}/make-permanent", h.MakePermanent) // POST /users/{id}/make-permanent
-	r.Delete("/{id}", h.DeleteUser)                 // DELETE /users/{id}
-
-	return r
+func NewUserRouter(r chi.Router, h *handler.UserHandler) {
+	r.Route("/users", func(r chi.Router) {
+		r.Post("/", h.CreateUser)
+		r.Put("/{id}", h.UpdateUser)
+		r.Get("/owned", h.ListOwnedUsers)
+		r.Post("/{id}/make-permanent", h.MakePermanent)
+		r.Delete("/{id}", h.DeleteUser)
+	})
 }

@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"RazdelyCheck/internal/handler"
+	"RazdelyCheck/internal/middleware"
 
 	"github.com/go-chi/chi/v5"
 )
@@ -19,34 +20,15 @@ func NewRouter(
 ) http.Handler {
 	r := chi.NewRouter()
 
-	// middleware можно добавить сюда, если нужно
-	// r.Use(middleware.Logger)
-	// r.Use(middleware.Recoverer)
+	r.Use(middleware.Logging)
+	r.Use(middleware.Recovery)
 
-	// подроутеры
-	r.Route("/checks", func(r chi.Router) {
-		r.Mount("/", NewCheckRouter(checkHandler))
-	})
-
-	r.Route("/check-results", func(r chi.Router) {
-		r.Mount("/", NewCheckResultRouter(checkResultHandler))
-	})
-
-	r.Route("/items", func(r chi.Router) {
-		r.Mount("/", NewItemRouter(itemHandler))
-	})
-
-	r.Route("/groups", func(r chi.Router) {
-		r.Mount("/", NewGroupRouter(groupHandler))
-	})
-
-	r.Route("/users", func(r chi.Router) {
-		r.Mount("/", NewUserRouter(userHandler))
-	})
-
-	r.Route("/check_sources", func(r chi.Router) {
-		r.Mount("/", NewCheckSourceRouter(checkSourceHandler))
-	})
+	NewCheckRouter(r, checkHandler)
+	NewCheckResultRouter(r, checkResultHandler)
+	NewItemRouter(r, itemHandler)
+	NewGroupRouter(r, groupHandler)
+	NewUserRouter(r, userHandler)
+	NewCheckSourceRouter(r, checkSourceHandler)
 
 	return r
 }
